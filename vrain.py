@@ -14,6 +14,7 @@ import math
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Any
+from collections import defaultdict
 
 # 第三方库导入
 try:
@@ -34,7 +35,7 @@ except ImportError as e:
 
 # 全局常量 - 完全对应Perl版本
 SOFTWARE = 'vRain'
-VERSION = 'v1.4'
+VERSION = 'v1.4(Multirows)'
 
 class VRainPerfect:
     """完美复刻Perl版本的vRain工具"""
@@ -45,8 +46,8 @@ class VRainPerfect:
         
         # 配置数据
         self.zhnums = {}
-        self.book = {}
-        self.canvas_config = {}
+        self.book = defaultdict(str)
+        self.canvas = defaultdict(str)
         
         # 字体相关
         self.fonts = {}  # 字体信息字典，对应Perl的%fonts
@@ -64,6 +65,7 @@ class VRainPerfect:
         self.pos_l = []  # 对应Perl的@pos_l
         self.pos_r = []  # 对应Perl的@pos_r
         self.page_chars_num = 0  # 每页字符数
+        self.multirows_num = 1  # 多行排版时的行数
         
         # 简繁转换
         try:
@@ -264,50 +266,88 @@ class VRainPerfect:
                 
                 if '=' in line:
                     k, v = line.split('=', 1)
-                    self.canvas_config[k] = v
+                    self.canvas[k] = v
         
-        print(f"\t尺寸：{self.canvas_config.get('canvas_width', '')} x {self.canvas_config.get('canvas_height', '')}")
-        print(f"\t列数：{self.canvas_config.get('leaf_col', '')}")
+        print(f"\t尺寸：{self.canvas.get('canvas_width', '')} x {self.canvas.get('canvas_height', '')}")
+        print(f"\t列数：{self.canvas.get('leaf_col', '')}")
     
     def calculate_positions(self):
         """计算文字位置 - 完全对应Perl版本"""
-        canvas_width = int(self.canvas_config.get('canvas_width', 2480))
-        canvas_height = int(self.canvas_config.get('canvas_height', 1860))
-        margins_top = int(self.canvas_config.get('margins_top', 200))
-        margins_bottom = int(self.canvas_config.get('margins_bottom', 50))
-        margins_left = int(self.canvas_config.get('margins_left', 50))
-        margins_right = int(self.canvas_config.get('margins_right', 50))
-        col_num = int(self.canvas_config.get('leaf_col', 24))
-        lc_width = int(self.canvas_config.get('leaf_center_width', 120))
+        canvas_width = int(self.canvas.get('canvas_width', 2480))
+        canvas_height = int(self.canvas.get('canvas_height', 1860))
+        margins_top = int(self.canvas.get('margins_top', 200))
+        margins_bottom = int(self.canvas.get('margins_bottom', 50))
+        margins_left = int(self.canvas.get('margins_left', 50))
+        margins_right = int(self.canvas.get('margins_right', 50))
+        col_num = int(self.canvas.get('leaf_col', 24))
+        lc_width = int(self.canvas.get('leaf_center_width', 120))
         row_num = int(self.book.get('row_num', 30))
         row_delta_y = int(self.book.get('row_delta_y', 10))
+
+        if_multirows, multirows_hl, multirows_num = int(self.canvas.get('if_multirows', 0)), int(self.book.get('multirows_horizontal_layout', 1)), int(self.canvas.get('multirows_num', 1))
+        self.multirows_num = multirows_num
         
         # 计算列宽、行高 - 完全对应Perl版本
         cw = (canvas_width - margins_left - margins_right - lc_width) / col_num
         rh = (canvas_height - margins_top - margins_bottom) / row_num
         
         # 生成文字坐标 - 完全对应Perl版本的逻辑
-        self.pos_l = []  # 不使用None，直接使用空列表
-        self.pos_r = []
-        
-        # 添加第0个元素作为占位符，使索引从1开始，对应Perl数组
-        self.pos_l.append([0, 0])  # 索引从1开始，对应Perl数组
-        self.pos_r.append([0, 0])
-        
-        for i in range(1, col_num + 1):
-            for j in range(1, row_num + 1):
-                if i <= col_num // 2:
-                    pos_x = canvas_width - margins_right - cw * i
-                else:
-                    pos_x = canvas_width - margins_right - cw * i - lc_width
-                
-                pos_y = canvas_height - margins_top - rh * j + row_delta_y
-                
-                self.pos_l.append([pos_x, pos_y])
-                self.pos_r.append([pos_x + cw/2, pos_y])
-        
+        self.pos_r = [[0,0]]  #单列左右双排
+        self.pos_l = [[0,0]]
+        if if_multirows and multirows_num != 1:
+            if row_num % multirows_num != 0:
+                print("错误：多行排版时，每页行数必须能被多行数整除！")
+                sys.exit(1)
+            rrow_num = row_num // multirows_num #相当于减小每列字数，拉长增加总列数
+
+            # 横向整叶换行，族谱
+            if multirows_hl == 1:
+                for rid in range(1, multirows_num + 1):
+                    for i in range(1, col_num + 1):
+                        for j in range(1, rrow_num + 1):
+                            if i <= col_num / 2:
+                                pos_x = canvas_width - margins_right - cw * i
+                            else:
+                                pos_x = canvas_width - margins_right - cw * i - lc_width
+                            pos_y = canvas_height - margins_top - rrow_num * (rid - 1) * rh - rh * j + row_delta_y
+                            self.pos_l.append([pos_x, pos_y])
+                            self.pos_r.append([pos_x + cw / 2, pos_y])
+
+            # 横向整页换行，字典
+            if multirows_hl == 2:
+                for rid in range(1, multirows_num + 1):
+                    for i in range(1, int(col_num / 2) + 1):
+                        for j in range(1, rrow_num + 1):
+                            pos_x = canvas_width - margins_right - cw * i
+                            pos_y = canvas_height - margins_top - rrow_num * (rid - 1) * rh - rh * j + row_delta_y
+                            self.pos_l.append([pos_x, pos_y])
+                            self.pos_r.append([pos_x + cw / 2, pos_y])
+                for rid in range(1, multirows_num + 1):
+                    for i in range(int(col_num / 2) + 1, col_num + 1):
+                        for j in range(1, rrow_num + 1):
+                            pos_x = canvas_width - margins_right - cw * i - lc_width
+                            pos_y = canvas_height - margins_top - rrow_num * (rid - 1) * rh - rh * j + row_delta_y
+                            self.pos_l.append([pos_x, pos_y])
+                            self.pos_r.append([pos_x + cw / 2, pos_y])
+            row_num = rrow_num  # 更新列字数
+        else:
+            for i in range(1, col_num + 1):
+                for j in range(1, row_num + 1):
+                    if i <= col_num // 2:
+                        pos_x = canvas_width - margins_right - cw * i
+                    else:
+                        pos_x = canvas_width - margins_right - cw * i - lc_width
+                    
+                    pos_y = canvas_height - margins_top - rh * j + row_delta_y
+                    
+                    self.pos_l.append([pos_x, pos_y])
+                    self.pos_r.append([pos_x + cw/2, pos_y])
+
+        # 重要常量：每页字符计数器
         self.page_chars_num = col_num * row_num
-        
+        if if_multirows and multirows_num != 1:
+            self.page_chars_num *= multirows_num
+
         # 存储用于后续计算的变量
         self.canvas_width = canvas_width
         self.canvas_height = canvas_height
@@ -504,8 +544,8 @@ class VRainPerfect:
             sys.exit(1)
         
         # 获取配置参数
-        canvas_width = int(self.canvas_config.get('canvas_width', 2480))
-        canvas_height = int(self.canvas_config.get('canvas_height', 1860))
+        canvas_width = int(self.canvas.get('canvas_width', 2480))
+        canvas_height = int(self.canvas.get('canvas_height', 1860))
         canvas_id = self.book.get('canvas_id')
         
         # 创建PDF文档 - 对应Perl的PDF::Builder->new
@@ -530,7 +570,7 @@ class VRainPerfect:
         # PDF元数据 - 完全对应Perl版本
         title = self.book.get('title', '')
         author = self.book.get('author', '')
-        logo_text = self.canvas_config.get('logo_text', '')
+        logo_text = self.canvas['logo_text']
         
         c.setTitle(title)
         c.setAuthor(author)
@@ -1043,6 +1083,15 @@ class VRainPerfect:
                     pcnt = self.page_chars_num
                     continue
             
+            elif char == "^": #多栏模式下跳转到下一栏
+                for _ in range(self.row_num - 1):
+                    if chars and chars[0] in (' ', '\r', '\n'):
+                        chars.pop(0)
+                if pcnt % (self.page_chars_num // self.multirows_num) == 0:
+                    continue
+                pcnt = (int(pcnt / (self.page_chars_num // self.multirows_num)) + 1) * (self.page_chars_num // self.multirows_num)
+                continue
+
             elif char == '%':  # 跳到页尾
                 for _ in range(self.row_num - 1):
                     if chars and chars[0] == ' ':
