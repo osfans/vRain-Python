@@ -557,7 +557,13 @@ class VRainPerfect:
             
             if tid >= len(dats):
                 break
+
+            print(f"创建新PDF页[{pid}]...")
             
+            # 对应Perl版本的逻辑：每个文本文件都创建新页面
+            # 第一个文本也要创建新页面，因为封面已经占用了第一页
+            c.showPage()  # 为当前文本创建新页面
+
             dat = dats[tid]
             chars = list(dat)  # 字符数组
             rchars = []  # 标注文本字符
@@ -578,12 +584,7 @@ class VRainPerfect:
             tptitle = ''.join(tpchars)
             if tptitle not in outlines:
                 outlines[tptitle] = pid + 2  # 目录页码
-            
-            print(f"创建新PDF页[{pid}]...")
-            
-            # 对应Perl版本的逻辑：每个文本文件都创建新页面
-            # 第一个文本也要创建新页面，因为封面已经占用了第一页
-            c.showPage()  # 为当前文本创建新页面
+                c.bookmarkPage(str(pid + 2)) # 添加书签以便目录跳转
             
             # 添加背景图
             bg_image = f"canvas/{canvas_id}.jpg"
@@ -609,11 +610,10 @@ class VRainPerfect:
                 outlines_tmp[page_num] = ok
             
             # 对应Perl: my $otlines = $vpdf->outline();
-            # reportlab不支持直接的outline操作，但我们可以打印目录信息
             for otpid in sorted(outlines_tmp.keys()):
                 ottitle = outlines_tmp[otpid]
                 print(f"\t{ottitle} -> {otpid}")
-                # 注意：reportlab不支持PDF书签，这里只能打印目录信息
+                c.addOutlineEntry(ottitle, str(otpid)) # 添加目录项
         
         c.save()
         print(f"生成PDF文件'{pdf_file}'...完成！")
