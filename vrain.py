@@ -26,7 +26,8 @@ try:
     from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.lib.utils import ImageReader
     from reportlab.platypus import SimpleDocTemplate
-    from PIL import Image, ImageFont
+    from fontTools.ttLib import TTFont as FT_TTFont
+    from PIL import Image
     import opencc
 except ImportError as e:
     print(f"错误：缺少必要的依赖库: {e}")
@@ -55,6 +56,7 @@ class VRainPerfect:
         self.tfns = []   # 正文字体数组，对应Perl的@tfns
         self.cfns = []   # 批注字体数组，对应Perl的@cfns
         self.vfonts = {} # PDF字体对象，对应Perl的%vfonts
+        self.fonts_cmap = {}
         
         # PDF相关
         self.vpdf = None
@@ -360,14 +362,15 @@ class VRainPerfect:
         self.rh = rh
     
     def font_check(self, font_file, char):
-        """字体检查 - 对应Perl的font_check子程序"""
-        try:
-            font_path = f"fonts/{font_file}"
-            font = ImageFont.truetype(font_path, 40)
-            bbox = font.getbbox(char)
-            return bbox[2] > bbox[0] and bbox[3] > bbox[1]
-        except:
-            return False
+        """字体检查"""
+        font_path = f"fonts/{font_file}"
+        if font_path in self.fonts_cmap:
+            cmap = self.fonts_cmap[font_path]
+        else:
+            ft_font = FT_TTFont(font_path)
+            cmap = ft_font['cmap'].tables[0].ttFont.getBestCmap()
+            self.fonts_cmap[font_path] = cmap
+        return ord(char) in cmap
     
     def get_font(self, char, font_list):
         """获取字体 - 完全对应Perl的get_font子程序"""
