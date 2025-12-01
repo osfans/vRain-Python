@@ -1183,7 +1183,7 @@ class VRainPerfect:
                             else:
                                 fx += (self.cw - fsize) / 2
                             
-                            last = [fx, fy]
+                            last = self.pos_l[int(pcnt)]
                         
                         # 特殊颜色处理
                         if if_onlyperiod == 1 and char == '。':
