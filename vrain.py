@@ -1236,27 +1236,24 @@ class VRainPerfect:
         """压缩PDF - 对应Perl版本"""
         import platform
         
-        if platform.system() == 'Darwin':  # macOS
-            input_file = pdf_file
-            output_file = pdf_file.replace('.pdf', '_已压缩.pdf')
-            
-            print(f"压缩PDF文件'{output_file}'...")
-            import subprocess
-            
-            cmd = [
-                'gs', '-sDEVICE=pdfwrite', '-dCompatibilityLevel=1.4',
-                '-dPDFSETTINGS=/screen', '-dNOPAUSE', '-dQUIET', '-dBATCH',
-                f'-sOutputFile={output_file}', input_file
-            ]
-            
-            try:
-                subprocess.run(cmd, check=True)
-                os.remove(input_file)
-                print("完成！")
-            except subprocess.CalledProcessError:
-                print("PDF压缩失败，请确保已安装Ghostscript")
-        else:
-            print("建议：使用'-c'参数对PDF文件进行压缩！")
+        input_file = pdf_file
+        output_file = pdf_file.replace('.pdf', '_已压缩.pdf')
+        
+        print(f"压缩PDF文件'{output_file}'...")
+        import subprocess
+        
+        cmd = [
+            'gs', '-sDEVICE=pdfwrite', '-dCompatibilityLevel=1.4',
+            '-dPDFSETTINGS=/screen', '-dNOPAUSE', '-dQUIET', '-dBATCH',
+            f'-sOutputFile={output_file}', input_file
+        ]
+        
+        try:
+            subprocess.run(cmd, check=True)
+            os.remove(input_file)
+            print("完成！")
+        except subprocess.CalledProcessError:
+            print("PDF压缩失败，请确保已安装Ghostscript")
     
     def run(self):
         """主运行方法 - 完全对应Perl版本的主流程"""
